@@ -4,18 +4,34 @@ import requests
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from textblob import TextBlob
 import random
+from datetime import datetime, timedelta
 
 # Initialize VADER Analyzer
 analyzer = SentimentIntensityAnalyzer()
 
+# API-Football API Key
+api_football_key = '6d2f9db7d089f603e6affbebdf27d37d'
+
 # Function to fetch news related to the match
 def fetch_news(query):
-    api_key = '5672bdc979444d26a00e3bf8c670aac9'  # Replace with your NewsAPI key
+    api_key = '5672bdc979444d26a00e3bf8c670aac9'  # NewsAPI key
     url = f'https://newsapi.org/v2/everything?q={query}&apiKey={api_key}'
     response = requests.get(url)
     if response.status_code == 200:
         articles = response.json()['articles']
         return articles[:5]  # Return top 5 articles
+    else:
+        return []
+
+# Function to fetch real-time fixtures from API-Football
+def fetch_fixtures():
+    url = "https://v3.football.api-sports.io/fixtures?next=10"
+    headers = {
+        'x-apisports-key': api_football_key
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()['response']
     else:
         return []
 
@@ -34,10 +50,11 @@ def analyze_sentiment(text):
     return combined_sentiment
 
 # Function to select the most exciting upcoming match
-def select_exciting_match(matches):
+def select_exciting_match(fixtures):
     match_scores = {}
-    for match in matches:
-        home_team, away_team = match
+    for fixture in fixtures:
+        home_team = fixture['teams']['home']['name']
+        away_team = fixture['teams']['away']['name']
         home_news = fetch_news(home_team)
         away_news = fetch_news(away_team)
 
@@ -45,65 +62,70 @@ def select_exciting_match(matches):
         away_sentiment = sum([analyze_sentiment(article['description'] or "") for article in away_news])
 
         excitement_score = abs(home_sentiment) + abs(away_sentiment)
-        match_scores[match] = excitement_score
+        match_scores[(home_team, away_team, fixture['fixture']['date'])] = excitement_score
 
     most_exciting_match = max(match_scores, key=match_scores.get)
     return most_exciting_match
 
 # Streamlit App
-st.title("RivexPredictor - AI Match Predictions (VADER + TextBlob)")
-
-# Team Selection
-teams = ["Manchester City", "Arsenal", "Liverpool", "Chelsea", "Manchester United", "Tottenham"]
-matches = [(home, away) for home in teams for away in teams if home != away]
+st.title("RivexPredictor - AI Match Predictions (Real-Time Fixtures)")
 
 if st.button("Pick Most Exciting Match"):
-    selected_match = select_exciting_match(matches)
-    home_team, away_team = selected_match
-    st.write(f"Selected Match: **{home_team} vs {away_team}**")
+    fixtures = fetch_fixtures()
+    if fixtures:
+        selected_match = select_exciting_match(fixtures)
+        home_team, away_team, match_datetime = selected_match
+        match_date = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").date()
+        match_time = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").time()
 
-    # Fetch and Display News
-    st.subheader("📰 Latest News & Pundit Reviews")
-    home_news = fetch_news(home_team)
-    away_news = fetch_news(away_team)
+        st.write(f"Selected Match: **{home_team} vs {away_team}**")
+        st.write(f"Match Date: **{match_date}**")
+        st.write(f"Match Time: **{match_time.strftime('%H:%M')}**")
 
-    home_sentiment = 0
-    away_sentiment = 0
+        # Fetch and Display News
+        st.subheader("📰 Latest News & Pundit Reviews")
+        home_news = fetch_news(home_team)
+        away_news = fetch_news(away_team)
 
-    if home_news:
-        st.write(f"**{home_team} News:**")
-        for article in home_news:
-            st.write(f"- [{article['title']}]({article['url']})")
-            home_sentiment += analyze_sentiment(article['description'] or "")
+        home_sentiment = 0
+        away_sentiment = 0
+
+        if home_news:
+            st.write(f"**{home_team} News:**")
+            for article in home_news:
+                st.write(f"- [{article['title']}]({article['url']})")
+                home_sentiment += analyze_sentiment(article['description'] or "")
+        else:
+            st.write(f"No recent news found for {home_team}.")
+
+        if away_news:
+            st.write(f"**{away_team} News:**")
+            for article in away_news:
+                st.write(f"- [{article['title']}]({article['url']})")
+                away_sentiment += analyze_sentiment(article['description'] or "")
+        else:
+            st.write(f"No recent news found for {away_team}.")
+
+        # Average Sentiment
+        home_sentiment /= max(len(home_news), 1)
+        away_sentiment /= max(len(away_news), 1)
+
+        # Prediction Logic
+        st.subheader("⚽ Match Prediction")
+        home_advantage = random.uniform(0, 0.2)
+        prediction_score = home_sentiment + home_advantage - away_sentiment
+
+        if prediction_score > 0.1:
+            result = f"{home_team} Win"
+        elif prediction_score < -0.1:
+            result = f"{away_team} Win"
+        else:
+            result = "Draw"
+
+        st.write(f"Predicted Outcome: **{result}**")
+        st.write(f"Predicted Scoreline: {random.randint(1, 3)} - {random.randint(0, 2)}")
     else:
-        st.write(f"No recent news found for {home_team}.")
-
-    if away_news:
-        st.write(f"**{away_team} News:**")
-        for article in away_news:
-            st.write(f"- [{article['title']}]({article['url']})")
-            away_sentiment += analyze_sentiment(article['description'] or "")
-    else:
-        st.write(f"No recent news found for {away_team}.")
-
-    # Average Sentiment
-    home_sentiment /= max(len(home_news), 1)
-    away_sentiment /= max(len(away_news), 1)
-
-    # Prediction Logic
-    st.subheader("⚽ Match Prediction")
-    home_advantage = random.uniform(0, 0.2)
-    prediction_score = home_sentiment + home_advantage - away_sentiment
-
-    if prediction_score > 0.1:
-        result = f"{home_team} Win"
-    elif prediction_score < -0.1:
-        result = f"{away_team} Win"
-    else:
-        result = "Draw"
-
-    st.write(f"Predicted Outcome: **{result}**")
-    st.write(f"Predicted Scoreline: {random.randint(1, 3)} - {random.randint(0, 2)}")
+        st.error("No upcoming fixtures found or API limit reached.")
 
 # Note for User
-st.markdown("_This version combines VADER and TextBlob sentiment analysis and includes a random exciting match picker._")
+st.markdown("_This version integrates real-time match fixtures from API-Football and includes enhanced sentiment analysis._")
