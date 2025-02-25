@@ -13,13 +13,18 @@ analyzer = SentimentIntensityAnalyzer()
 # API-Football API Key
 api_football_key = '6d2f9db7d089f603e6affbebdf27d37d'
 
-# Leagues for Italy, London (England), Spain, Germany, USA
+# Top 10 leagues worldwide
 league_ids = {
-    'Italy': 135,
-    'England': 39,
-    'Spain': 140,
-    'Germany': 78,
-    'USA': 253
+    'Premier League': 39,
+    'La Liga': 140,
+    'Serie A': 135,
+    'Bundesliga': 78,
+    'Ligue 1': 61,
+    'MLS': 253,
+    'Saudi Pro League': 307,
+    'Eredivisie': 88,
+    'Liga MX': 262,
+    'J1 League': 98
 }
 
 # Function to fetch news related to the match
@@ -84,12 +89,12 @@ def analyze_sentiment(text):
 
 # Function to create a roulette wheel
 def create_roulette_wheel(matches):
-    labels = [f"{m['teams']['home']['name']} vs {m['teams']['away']['name']}" for m in matches]
+    labels = [f"{m['teams']['home']['name']} vs {m['teams']['away']['name']}" for m in matches[:10]]  # Limit to top 10
     fig = go.Figure(go.Pie(labels=labels, hole=0.3))
     fig.update_traces(textinfo='label+percent', pull=[0.1]*len(labels))
     return fig
 
-# Function to get top 30 trending fixtures based on sentiment
+# Function to get top 10 trending fixtures based on sentiment
 def get_top_trending_fixtures(fixtures):
     scored_fixtures = []
 
@@ -102,48 +107,62 @@ def get_top_trending_fixtures(fixtures):
 
     # Sort by sentiment score (descending)
     scored_fixtures.sort(key=lambda x: x[1], reverse=True)
-    top_fixtures = [f[0] for f in scored_fixtures[:30]]
+    top_fixtures = [f[0] for f in scored_fixtures[:10]]
 
     return top_fixtures
 
 # Streamlit App
-st.title("RivexPredictor - AI Match Predictions (Trending Roulette Wheel Edition)")
+st.title("RivexFootyPredictor - Global Top 10 Trending Matches Edition")
 
-# Button to load top 30 trending fixtures
-if st.button("📥 Load Top 30 Trending Fixtures onto the Roulette Wheel"):
+# Load and display top 10 trending matches
+if st.button("📊 Show Top 10 Trending Games Worldwide"):
     fixtures = fetch_fixtures()
 
     if fixtures:
         trending_fixtures = get_top_trending_fixtures(fixtures)
-        st.subheader("🎡 Spin the Roulette Wheel to Pick a Trending Match")
-        wheel_fig = create_roulette_wheel(trending_fixtures)
-        st.plotly_chart(wheel_fig)
+        st.subheader("🔥 Top 10 Trending Matches:")
+        for i, fixture in enumerate(trending_fixtures, 1):
+            home_team = fixture['teams']['home']['name']
+            away_team = fixture['teams']['away']['name']
+            match_date = fixture['fixture']['date'][:10]
+            st.write(f"{i}. {home_team} vs {away_team} - {match_date}")
 
-        if st.button("🎯 Spin Roulette"):
+        # Load into Roulette Wheel
+        if st.button("🎡 Spin Roulette to Pick a Match"):
+            wheel_fig = create_roulette_wheel(trending_fixtures)
+            st.plotly_chart(wheel_fig)
+
+            # Randomly select a match after spin
             selected_match = random.choice(trending_fixtures)
             home_team = selected_match['teams']['home']['name']
             away_team = selected_match['teams']['away']['name']
             match_datetime = selected_match['fixture']['date']
-            match_date = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").astimezone(tz=timedelta(hours=-8)).date()
-            match_time = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").astimezone(tz=timedelta(hours=-8)).time()
 
-            st.write(f"Selected Match: **{home_team} vs {away_team}**")
-            st.write(f"Match Date: **{match_date}**")
-            st.write(f"Match Time: **{match_time.strftime('%H:%M')}**")
+            # Display Key Players, Team News, and Sentiment
+            st.write(f"🎯 Selected Match: {home_team} vs {away_team} on {match_datetime}")
 
-            # Fetch and Display News
-            st.subheader("📰 Latest News & Pundit Reviews")
+            # Predicted Outcome moved to the end
             home_news = fetch_news(home_team)
             away_news = fetch_news(away_team)
 
             home_sentiment = sum([analyze_sentiment(article['description'] or "") for article in home_news])
             away_sentiment = sum([analyze_sentiment(article['description'] or "") for article in away_news])
 
-            # Prediction Logic
-            st.subheader("⚽ Match Prediction")
             home_advantage = random.uniform(0, 0.2)
             prediction_score = home_sentiment + home_advantage - away_sentiment
 
+            # Display other details first
+            st.subheader("⚽ Key Players to Watch")
+            st.write(f"**{home_team} Key Players:**")
+            for player in [article['title'] for article in home_news][:3]:
+                st.write(f"- {player}")
+
+            st.write(f"**{away_team} Key Players:**")
+            for player in [article['title'] for article in away_news][:3]:
+                st.write(f"- {player}")
+
+            # Finally, highlight the predicted outcome
+            st.subheader("🔮 Predicted Outcome")
             if prediction_score > 0.1:
                 result = f"{home_team} Win"
             elif prediction_score < -0.1:
@@ -151,10 +170,8 @@ if st.button("📥 Load Top 30 Trending Fixtures onto the Roulette Wheel"):
             else:
                 result = "Draw"
 
-            st.write(f"Predicted Outcome: **{result}**")
-            st.write(f"Predicted Scoreline: {random.randint(1, 3)} - {random.randint(0, 2)}")
-    else:
-        st.error("No fixtures found or API limit reached.")
+            st.write(f"**Predicted Result:** {result}")
+            st.write(f"**Predicted Scoreline:** {random.randint(1, 3)} - {random.randint(0, 2)}")
 
-# Note for User
-st.markdown("_This version loads the top 30 trending fixtures based on news sentiment and displays them on a roulette wheel._")
+# Note for Users
+# st.markdown("_This version now uses direct API-Football access with the correct header for API calls._")
