@@ -89,21 +89,38 @@ def create_roulette_wheel(matches):
     fig.update_traces(textinfo='label+percent', pull=[0.1]*len(labels))
     return fig
 
-# Streamlit App
-st.title("RivexPredictor - AI Match Predictions (Roulette Wheel Edition)")
+# Function to get top 30 trending fixtures based on sentiment
+def get_top_trending_fixtures(fixtures):
+    scored_fixtures = []
 
-# Button to load top 30 fixtures
-if st.button("📥 Load Top 30 Fixtures onto the Roulette Wheel"):
+    for fixture in fixtures:
+        home_team = fixture['teams']['home']['name']
+        away_team = fixture['teams']['away']['name']
+        combined_news = fetch_news(home_team) + fetch_news(away_team)
+        sentiment_score = sum([analyze_sentiment(article['description'] or "") for article in combined_news])
+        scored_fixtures.append((fixture, sentiment_score))
+
+    # Sort by sentiment score (descending)
+    scored_fixtures.sort(key=lambda x: x[1], reverse=True)
+    top_fixtures = [f[0] for f in scored_fixtures[:30]]
+
+    return top_fixtures
+
+# Streamlit App
+st.title("RivexPredictor - AI Match Predictions (Trending Roulette Wheel Edition)")
+
+# Button to load top 30 trending fixtures
+if st.button("📥 Load Top 30 Trending Fixtures onto the Roulette Wheel"):
     fixtures = fetch_fixtures()
 
     if fixtures:
-        fixtures = fixtures[:30]  # Limit to top 30 fixtures
-        st.subheader("🎡 Spin the Roulette Wheel to Pick a Match")
-        wheel_fig = create_roulette_wheel(fixtures)
+        trending_fixtures = get_top_trending_fixtures(fixtures)
+        st.subheader("🎡 Spin the Roulette Wheel to Pick a Trending Match")
+        wheel_fig = create_roulette_wheel(trending_fixtures)
         st.plotly_chart(wheel_fig)
 
         if st.button("🎯 Spin Roulette"):
-            selected_match = random.choice(fixtures)
+            selected_match = random.choice(trending_fixtures)
             home_team = selected_match['teams']['home']['name']
             away_team = selected_match['teams']['away']['name']
             match_datetime = selected_match['fixture']['date']
@@ -140,4 +157,4 @@ if st.button("📥 Load Top 30 Fixtures onto the Roulette Wheel"):
         st.error("No fixtures found or API limit reached.")
 
 # Note for User
-st.markdown("_This version includes a roulette wheel to pick trending matches from real-time data, with league filters and a 7-day window._")
+st.markdown("_This version loads the top 30 trending fixtures based on news sentiment and displays them on a roulette wheel._")
