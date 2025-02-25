@@ -48,20 +48,29 @@ def fetch_fixtures():
             'timezone': 'UTC'
         }
         headers = {
-            'x-apisports-key': api_football_key
+            'x-apisports-key': api_football_key,
+            'Content-Type': 'application/json'
         }
-        response = requests.get(url, headers=headers, params=params)
+        try:
+            response = requests.get(url, headers=headers, params=params)
 
-        if response.status_code == 200:
-            data = response.json()
-            if data['response']:
-                fixtures.extend(data['response'])
-        elif response.status_code == 429:
-            st.error("API request limit reached. Please wait or upgrade your plan.")
-            return []
-        else:
-            st.error(f"API Error: {response.status_code} - {response.reason}")
-            st.text(f"API Response: {response.text}")
+            if response.status_code == 200:
+                data = response.json()
+                if data['response']:
+                    fixtures.extend(data['response'])
+                else:
+                    st.warning(f"No fixtures found for {league_name}.")
+            elif response.status_code == 401:
+                st.error("Unauthorized access. Check API key.")
+                return []
+            elif response.status_code == 429:
+                st.error("API request limit reached. Please wait or upgrade your plan.")
+                return []
+            else:
+                st.error(f"API Error: {response.status_code} - {response.reason}")
+                st.text(f"API Response: {response.text}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
     return fixtures
 
