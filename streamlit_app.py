@@ -94,7 +94,7 @@ def create_roulette_wheel(matches):
     fig.update_traces(textinfo='label+percent', pull=[0.1]*len(labels))
     return fig
 
-# Function to get top 10 trending fixtures based on sentiment
+# Function to get top 10 trending fixtures based on sentiment (headline-based)
 def get_top_trending_fixtures(fixtures):
     scored_fixtures = []
 
@@ -102,7 +102,7 @@ def get_top_trending_fixtures(fixtures):
         home_team = fixture['teams']['home']['name']
         away_team = fixture['teams']['away']['name']
         combined_news = fetch_news(home_team) + fetch_news(away_team)
-        sentiment_score = sum([analyze_sentiment(article['description'] or "") for article in combined_news])
+        sentiment_score = sum([analyze_sentiment(article.get('title', "")) for article in combined_news])
         scored_fixtures.append((fixture, sentiment_score))
 
     # Sort by sentiment score (descending)
@@ -138,20 +138,20 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             away_team = selected_match['teams']['away']['name']
             match_datetime = selected_match['fixture']['date']
 
-            # Display Key Players, Team News, and Sentiment
+            # Display Selected Match
             st.write(f"🎯 Selected Match: {home_team} vs {away_team} on {match_datetime}")
 
-            # Predicted Outcome moved to the end
+            # Fetch Detailed News After Selection
             home_news = fetch_news(home_team)
             away_news = fetch_news(away_team)
 
-            home_sentiment = sum([analyze_sentiment(article['description'] or "") for article in home_news])
-            away_sentiment = sum([analyze_sentiment(article['description'] or "") for article in away_news])
+            home_sentiment = sum([analyze_sentiment(article.get('description', "")) for article in home_news])
+            away_sentiment = sum([analyze_sentiment(article.get('description', "")) for article in away_news])
 
             home_advantage = random.uniform(0, 0.2)
             prediction_score = home_sentiment + home_advantage - away_sentiment
 
-            # Display other details first
+            # Display Key Players
             st.subheader("⚽ Key Players to Watch")
             st.write(f"**{home_team} Key Players:**")
             for player in [article['title'] for article in home_news][:3]:
@@ -174,4 +174,4 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             st.write(f"**Predicted Scoreline:** {random.randint(1, 3)} - {random.randint(0, 2)}")
 
 # Note for Users
-# st.markdown("_This version now uses direct API-Football access with the correct header for API calls._")
+# st.markdown("_This version fetches basic sentiment for ranking and detailed news after match selection._")
