@@ -5,6 +5,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from textblob import TextBlob
 import random
 from datetime import datetime, timedelta
+import plotly.graph_objects as go
 
 # Initialize VADER Analyzer
 analyzer = SentimentIntensityAnalyzer()
@@ -23,12 +24,12 @@ def fetch_news(query):
     else:
         return []
 
-# Function to fetch real-time fixtures from API-Football with error handling
+# Function to fetch real-time fixtures from API-Football
 def fetch_fixtures():
     url = "https://v3.football.api-sports.io/fixtures"
     params = {
-        'next': 10,  # Fetch next 10 fixtures
-        'timezone': 'Europe/London'  # Ensure timezone compatibility
+        'next': 30,  # Fetch next 30 fixtures
+        'timezone': 'UTC'
     }
     headers = {
         'x-apisports-key': api_football_key
@@ -51,100 +52,65 @@ def fetch_fixtures():
 
 # Function to perform sentiment analysis using VADER and TextBlob
 def analyze_sentiment(text):
-    # VADER Sentiment
     vader_sentiment = analyzer.polarity_scores(text)['compound']
-
-    # TextBlob Sentiment
     blob = TextBlob(text)
     textblob_sentiment = blob.sentiment.polarity
-
-    # Combine both scores (average)
     combined_sentiment = (vader_sentiment + textblob_sentiment) / 2
-
     return combined_sentiment
 
-# Function to select the most exciting upcoming match
-def select_exciting_match(fixtures):
-    match_scores = {}
-    for fixture in fixtures:
-        home_team = fixture['teams']['home']['name']
-        away_team = fixture['teams']['away']['name']
+# Function to create a roulette wheel
+def create_roulette_wheel(matches):
+    labels = [f"{m['teams']['home']['name']} vs {m['teams']['away']['name']}" for m in matches]
+    fig = go.Figure(go.Pie(labels=labels, hole=0.3))
+    fig.update_traces(textinfo='label+percent', pull=[0.1]*len(labels))
+    return fig
+
+# Streamlit App
+st.title("RivexPredictor - AI Match Predictions (Roulette Wheel Edition)")
+
+fixtures = fetch_fixtures()
+
+if fixtures:
+    st.subheader("🎡 Spin the Roulette Wheel to Pick a Match")
+    wheel_fig = create_roulette_wheel(fixtures)
+    st.plotly_chart(wheel_fig)
+
+    if st.button("🎯 Spin Roulette"):
+        selected_match = random.choice(fixtures)
+        home_team = selected_match['teams']['home']['name']
+        away_team = selected_match['teams']['away']['name']
+        match_datetime = selected_match['fixture']['date']
+        match_date = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").astimezone(tz=timedelta(hours=-8)).date()
+        match_time = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").astimezone(tz=timedelta(hours=-8)).time()
+
+        st.write(f"Selected Match: **{home_team} vs {away_team}**")
+        st.write(f"Match Date: **{match_date}**")
+        st.write(f"Match Time: **{match_time.strftime('%H:%M')}**")
+
+        # Fetch and Display News
+        st.subheader("📰 Latest News & Pundit Reviews")
         home_news = fetch_news(home_team)
         away_news = fetch_news(away_team)
 
         home_sentiment = sum([analyze_sentiment(article['description'] or "") for article in home_news])
         away_sentiment = sum([analyze_sentiment(article['description'] or "") for article in away_news])
 
-        excitement_score = abs(home_sentiment) + abs(away_sentiment)
-        match_scores[(home_team, away_team, fixture['fixture']['date'])] = excitement_score
+        # Prediction Logic
+        st.subheader("⚽ Match Prediction")
+        home_advantage = random.uniform(0, 0.2)
+        prediction_score = home_sentiment + home_advantage - away_sentiment
 
-    if match_scores:
-        most_exciting_match = max(match_scores, key=match_scores.get)
-        return most_exciting_match
-    else:
-        st.error("No exciting matches found.")
-        return None
+        if prediction_score > 0.1:
+            result = f"{home_team} Win"
+        elif prediction_score < -0.1:
+            result = f"{away_team} Win"
+        else:
+            result = "Draw"
 
-# Streamlit App
-st.title("RivexPredictor - AI Match Predictions (Real-Time Fixtures)")
-
-if st.button("Pick Most Exciting Match"):
-    fixtures = fetch_fixtures()
-    if fixtures:
-        selected_match = select_exciting_match(fixtures)
-        if selected_match:
-            home_team, away_team, match_datetime = selected_match
-            match_date = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").date()
-            match_time = datetime.strptime(match_datetime, "%Y-%m-%dT%H:%M:%S%z").time()
-
-            st.write(f"Selected Match: **{home_team} vs {away_team}**")
-            st.write(f"Match Date: **{match_date}**")
-            st.write(f"Match Time: **{match_time.strftime('%H:%M')}**")
-
-            # Fetch and Display News
-            st.subheader("📰 Latest News & Pundit Reviews")
-            home_news = fetch_news(home_team)
-            away_news = fetch_news(away_team)
-
-            home_sentiment = 0
-            away_sentiment = 0
-
-            if home_news:
-                st.write(f"**{home_team} News:**")
-                for article in home_news:
-                    st.write(f"- [{article['title']}]({article['url']})")
-                    home_sentiment += analyze_sentiment(article['description'] or "")
-            else:
-                st.write(f"No recent news found for {home_team}.")
-
-            if away_news:
-                st.write(f"**{away_team} News:**")
-                for article in away_news:
-                    st.write(f"- [{article['title']}]({article['url']})")
-                    away_sentiment += analyze_sentiment(article['description'] or "")
-            else:
-                st.write(f"No recent news found for {away_team}.")
-
-            # Average Sentiment
-            home_sentiment /= max(len(home_news), 1)
-            away_sentiment /= max(len(away_news), 1)
-
-            # Prediction Logic
-            st.subheader("⚽ Match Prediction")
-            home_advantage = random.uniform(0, 0.2)
-            prediction_score = home_sentiment + home_advantage - away_sentiment
-
-            if prediction_score > 0.1:
-                result = f"{home_team} Win"
-            elif prediction_score < -0.1:
-                result = f"{away_team} Win"
-            else:
-                result = "Draw"
-
-            st.write(f"Predicted Outcome: **{result}**")
-            st.write(f"Predicted Scoreline: {random.randint(1, 3)} - {random.randint(0, 2)}")
-    else:
-        st.error("No upcoming fixtures found or API limit reached.")
+        st.write(f"Predicted Outcome: **{result}**")
+        st.write(f"Predicted Scoreline: {random.randint(1, 3)} - {random.randint(0, 2)}")
+else:
+    st.error("No fixtures found or API limit reached.")
 
 # Note for User
-st.markdown("_This version integrates real-time match fixtures from API-Football and includes enhanced sentiment analysis with error handling._")
+st.markdown("_This version includes a roulette wheel to pick trending matches from real-time data._")
