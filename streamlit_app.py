@@ -10,23 +10,21 @@ import plotly.graph_objects as go
 # Initialize VADER Analyzer
 analyzer = SentimentIntensityAnalyzer()
 
-# Football-Data.org API Key
-football_data_api_key = '2292620df705473dbddfbbb00505969b'
+# API-Football API Key
+api_football_key = '6d2f9db7d089f603e6affbebdf27d37d'
 
-# Free version leagues from Football-Data.org
-league_codes = {
-    'FIFA World Cup': 'WC',
-    'UEFA Champions League': 'CL',
-    'Bundesliga': 'BL1',
-    'Eredivisie': 'DED',
-    'Campeonato Brasileiro Série A': 'BSA',
-    'Primera Division': 'PD',
-    'Ligue 1': 'FL1',
-    'EFL Championship': 'ELC',
-    'Primeira Liga': 'PPL',
-    'European Championship': 'EC',
-    'Serie A': 'SA',
-    'Premier League': 'PL'
+# Top 10 leagues worldwide
+league_ids = {
+    'Premier League': 39,
+    'La Liga': 140,
+    'Serie A': 135,
+    'Bundesliga': 78,
+    'Ligue 1': 61,
+    'MLS': 253,
+    'Saudi Pro League': 307,
+    'Eredivisie': 88,
+    'Liga MX': 262,
+    'J1 League': 98
 }
 
 # Function to fetch news related to the match
@@ -40,38 +38,41 @@ def fetch_news(query):
     else:
         return []
 
-# Function to fetch fixtures with a valid date range
+# Function to fetch fixtures within the next 7 days for selected leagues
 def fetch_fixtures():
-    url = "https://api.football-data.org/v4/matches"
+    url = "https://v3.football.api-sports.io/fixtures"
+    start_date = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')  # Start from yesterday
+    end_date = (datetime.utcnow() + timedelta(days=7)).strftime('%Y-%m-%d')
     fixtures = []
 
-    headers = {
-        'X-Auth-Token': football_data_api_key,
-        'Content-Type': 'application/json'
-    }
-
-    # Football-Data.org allows a max 10-day period, so we keep it at 7 days max
-    start_date = datetime.utcnow().strftime('%Y-%m-%d')  # Start from today
-    end_date = (datetime.utcnow() + timedelta(days=7)).strftime('%Y-%m-%d')  # Extend only 7 days ahead
-
-    for league_name, league_code in league_codes.items():
+    for league_name, league_id in league_ids.items():
         params = {
-            'competitions': league_code,
-            'dateFrom': start_date,
-            'dateTo': end_date
+            'league': league_id,
+            'season': 2023,  # Ensure correct season format
+            'from': start_date,
+            'to': end_date,
+            'timezone': 'UTC'
+        }
+        headers = {
+            'x-apisports-key': api_football_key,
+            'Content-Type': 'application/json'
         }
         try:
             response = requests.get(url, headers=headers, params=params)
-            st.text(f"API Response for {league_name}: {response.text}")
+            st.text(f"API Request for {league_name}: {params}")  # Print request parameters
+            st.text(f"API Response for {league_name}: {response.text}")  # Print full response for debugging
 
             if response.status_code == 200:
                 data = response.json()
-                if 'matches' in data and data['matches']:
-                    fixtures.extend(data['matches'])
+                if data['response']:
+                    fixtures.extend(data['response'])
                 else:
-                    st.warning(f"No fixtures found for {league_name}. Verify league code and timeframe.")
+                    st.warning(f"No fixtures found for {league_name}. Verify league ID and season.")
             elif response.status_code == 401:
                 st.error("Unauthorized access. Check API key.")
+                return []
+            elif response.status_code == 429:
+                st.error("API request limit reached. Please wait or upgrade your plan.")
                 return []
             else:
                 st.error(f"API Error: {response.status_code} - {response.reason}")
@@ -91,20 +92,20 @@ def analyze_sentiment(text):
 
 # Function to create a roulette wheel
 def create_roulette_wheel(matches):
-    labels = [f"{m['homeTeam']['name']} vs {m['awayTeam']['name']}" for m in matches[:10]]  # Limit to top 10
+    labels = [f"{m['teams']['home']['name']} vs {m['teams']['away']['name']}" for m in matches[:10]]  # Limit to top 10
     fig = go.Figure(go.Pie(labels=labels, hole=0.3))
     fig.update_traces(textinfo='label+percent', pull=[0.1]*len(labels))
     return fig
 
-# Function to get top 10 trending fixtures based on sentiment (headline-based)
+# Function to get top 10 trending fixtures based on sentiment
 def get_top_trending_fixtures(fixtures):
     scored_fixtures = []
 
     for fixture in fixtures:
-        home_team = fixture['homeTeam']['name']
-        away_team = fixture['awayTeam']['name']
+        home_team = fixture['teams']['home']['name']
+        away_team = fixture['teams']['away']['name']
         combined_news = fetch_news(home_team) + fetch_news(away_team)
-        sentiment_score = sum([analyze_sentiment(article.get('title', "")) for article in combined_news])
+        sentiment_score = sum([analyze_sentiment(article['description'] or "") for article in combined_news])
         scored_fixtures.append((fixture, sentiment_score))
 
     # Sort by sentiment score (descending)
@@ -114,7 +115,7 @@ def get_top_trending_fixtures(fixtures):
     return top_fixtures
 
 # Streamlit App
-st.title("RivexFootyPredictor - Free League Edition (Football-Data.org)")
+st.title("RivexFootyPredictor - Global Top 10 Trending Matches Edition")
 
 # Load and display top 10 trending matches
 if st.button("📊 Show Top 10 Trending Games Worldwide"):
@@ -124,9 +125,9 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
         trending_fixtures = get_top_trending_fixtures(fixtures)
         st.subheader("🔥 Top 10 Trending Matches:")
         for i, fixture in enumerate(trending_fixtures, 1):
-            home_team = fixture['homeTeam']['name']
-            away_team = fixture['awayTeam']['name']
-            match_date = fixture['utcDate'][:10]
+            home_team = fixture['teams']['home']['name']
+            away_team = fixture['teams']['away']['name']
+            match_date = fixture['fixture']['date'][:10]
             st.write(f"{i}. {home_team} vs {away_team} - {match_date}")
 
         # Load into Roulette Wheel
@@ -136,12 +137,12 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
 
             # Randomly select a match after spin
             selected_match = random.choice(trending_fixtures)
-            home_team = selected_match['homeTeam']['name']
-            away_team = selected_match['awayTeam']['name']
-            match_datetime = selected_match['utcDate']
+            home_team = selected_match['teams']['home']['name']
+            away_team = selected_match['teams']['away']['name']
+            match_datetime = selected_match['fixture']['date']
 
             # Display Selected Match
             st.write(f"🎯 Selected Match: {home_team} vs {away_team} on {match_datetime}")
 
 # Note for Users
-st.markdown("_This version now only supports leagues available in the free Football-Data.org plan._")
+st.markdown("_This version now ensures correct fixture retrieval and improved debugging._")
