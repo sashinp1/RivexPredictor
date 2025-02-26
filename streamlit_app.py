@@ -38,17 +38,18 @@ def fetch_news(query):
     else:
         return []
 
-# Function to fetch fixtures within the next 7 days for selected leagues
+# Function to fetch fixtures within the next 10 days for selected leagues
 def fetch_fixtures():
     url = "https://v3.football.api-sports.io/fixtures"
-    end_date = (datetime.utcnow() + timedelta(days=7)).strftime('%Y-%m-%d')
+    start_date = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')  # Start from yesterday
+    end_date = (datetime.utcnow() + timedelta(days=10)).strftime('%Y-%m-%d')  # Extend to 10 days ahead
     fixtures = []
 
     for league_name, league_id in league_ids.items():
         params = {
             'league': league_id,
             'season': datetime.utcnow().year,
-            'from': datetime.utcnow().strftime('%Y-%m-%d'),
+            'from': start_date,
             'to': end_date,
             'timezone': 'UTC'
         }
@@ -174,4 +175,4 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             st.write(f"**Predicted Scoreline:** {random.randint(1, 3)} - {random.randint(0, 2)}")
 
 # Note for Users
-# st.markdown("_This version fetches basic sentiment for ranking and detailed news after match selection._")
+st.markdown("_This version expands the fixture search window and adjusts the timeframe to avoid missing matches._")
