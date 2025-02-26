@@ -38,17 +38,19 @@ def fetch_news(query):
     else:
         return []
 
-# Function to fetch fixtures within the next 10 days for selected leagues
+# Function to fetch fixtures with a valid date range
 def fetch_fixtures():
     url = "https://api.football-data.org/v4/matches"
-    start_date = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')  # Start from yesterday
-    end_date = (datetime.utcnow() + timedelta(days=10)).strftime('%Y-%m-%d')  # Extend to 10 days ahead
     fixtures = []
 
     headers = {
         'X-Auth-Token': football_data_api_key,
         'Content-Type': 'application/json'
     }
+
+    # Football-Data.org allows a max 10-day period, so we keep it at 7 days max
+    start_date = datetime.utcnow().strftime('%Y-%m-%d')  # Start from today
+    end_date = (datetime.utcnow() + timedelta(days=7)).strftime('%Y-%m-%d')  # Extend only 7 days ahead
 
     for league_name, league_code in league_codes.items():
         params = {
@@ -139,27 +141,5 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             # Display Selected Match
             st.write(f"🎯 Selected Match: {home_team} vs {away_team} on {match_datetime}")
 
-            # Fetch Detailed News After Selection
-            home_news = fetch_news(home_team)
-            away_news = fetch_news(away_team)
-
-            home_sentiment = sum([analyze_sentiment(article.get('description', "")) for article in home_news])
-            away_sentiment = sum([analyze_sentiment(article.get('description', "")) for article in away_news])
-
-            home_advantage = random.uniform(0, 0.2)
-            prediction_score = home_sentiment + home_advantage - away_sentiment
-
-            # Finally, highlight the predicted outcome
-            st.subheader("🔮 Predicted Outcome")
-            if prediction_score > 0.1:
-                result = f"{home_team} Win"
-            elif prediction_score < -0.1:
-                result = f"{away_team} Win"
-            else:
-                result = "Draw"
-
-            st.write(f"**Predicted Result:** {result}")
-            st.write(f"**Predicted Scoreline:** {random.randint(1, 3)} - {random.randint(0, 2)}")
-
 # Note for Users
-st.markdown("_This version now uses Football-Data.org API instead of API-Football._")
+st.markdown("_This version now ensures the date range is within the Football-Data.org 10-day limit._")
