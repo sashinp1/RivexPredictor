@@ -10,21 +10,21 @@ import plotly.graph_objects as go
 # Initialize VADER Analyzer
 analyzer = SentimentIntensityAnalyzer()
 
-# API-Football API Key
-api_football_key = '6d2f9db7d089f603e6affbebdf27d37d'
+# Football-Data.org API Key
+football_data_api_key = '2292620df705473dbddfbbb00505969b'
 
-# Top 10 leagues worldwide
-league_ids = {
-    'Premier League': 39,
-    'La Liga': 140,
-    'Serie A': 135,
-    'Bundesliga': 78,
-    'Ligue 1': 61,
-    'MLS': 253,
-    'Saudi Pro League': 307,
-    'Eredivisie': 88,
-    'Liga MX': 262,
-    'J1 League': 98
+# Top 10 leagues worldwide (Football-Data.org league codes)
+league_codes = {
+    'Premier League': 'PL',
+    'La Liga': 'PD',
+    'Serie A': 'SA',
+    'Bundesliga': 'BL1',
+    'Ligue 1': 'FL1',
+    'MLS': 'MLS',
+    'Eredivisie': 'DED',
+    'Liga MX': 'LMX',
+    'J1 League': 'J1',
+    'Champions League': 'CL'
 }
 
 # Function to fetch news related to the match
@@ -40,40 +40,34 @@ def fetch_news(query):
 
 # Function to fetch fixtures within the next 10 days for selected leagues
 def fetch_fixtures():
-    url = "https://v3.football.api-sports.io/fixtures"
+    url = "https://api.football-data.org/v4/matches"
     start_date = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')  # Start from yesterday
     end_date = (datetime.utcnow() + timedelta(days=10)).strftime('%Y-%m-%d')  # Extend to 10 days ahead
     fixtures = []
 
-    for league_name, league_id in league_ids.items():
+    headers = {
+        'X-Auth-Token': football_data_api_key,
+        'Content-Type': 'application/json'
+    }
+
+    for league_name, league_code in league_codes.items():
         params = {
-            'league': league_id,
-            'season': datetime.utcnow().year,  # Verify if this season year is correct
-            'from': start_date,
-            'to': end_date,
-            'timezone': 'UTC'
-        }
-        headers = {
-            'x-apisports-key': api_football_key,
-            'Content-Type': 'application/json'
+            'competitions': league_code,
+            'dateFrom': start_date,
+            'dateTo': end_date
         }
         try:
             response = requests.get(url, headers=headers, params=params)
-
-            # Debug: Print the full API response
             st.text(f"API Response for {league_name}: {response.text}")
 
             if response.status_code == 200:
                 data = response.json()
-                if data['response']:
-                    fixtures.extend(data['response'])
+                if 'matches' in data and data['matches']:
+                    fixtures.extend(data['matches'])
                 else:
-                    st.warning(f"No fixtures found for {league_name}. Verify league ID and season.")
+                    st.warning(f"No fixtures found for {league_name}. Verify league code and timeframe.")
             elif response.status_code == 401:
                 st.error("Unauthorized access. Check API key.")
-                return []
-            elif response.status_code == 429:
-                st.error("API request limit reached. Please wait or upgrade your plan.")
                 return []
             else:
                 st.error(f"API Error: {response.status_code} - {response.reason}")
@@ -93,7 +87,7 @@ def analyze_sentiment(text):
 
 # Function to create a roulette wheel
 def create_roulette_wheel(matches):
-    labels = [f"{m['teams']['home']['name']} vs {m['teams']['away']['name']}" for m in matches[:10]]  # Limit to top 10
+    labels = [f"{m['homeTeam']['name']} vs {m['awayTeam']['name']}" for m in matches[:10]]  # Limit to top 10
     fig = go.Figure(go.Pie(labels=labels, hole=0.3))
     fig.update_traces(textinfo='label+percent', pull=[0.1]*len(labels))
     return fig
@@ -103,8 +97,8 @@ def get_top_trending_fixtures(fixtures):
     scored_fixtures = []
 
     for fixture in fixtures:
-        home_team = fixture['teams']['home']['name']
-        away_team = fixture['teams']['away']['name']
+        home_team = fixture['homeTeam']['name']
+        away_team = fixture['awayTeam']['name']
         combined_news = fetch_news(home_team) + fetch_news(away_team)
         sentiment_score = sum([analyze_sentiment(article.get('title', "")) for article in combined_news])
         scored_fixtures.append((fixture, sentiment_score))
@@ -116,7 +110,7 @@ def get_top_trending_fixtures(fixtures):
     return top_fixtures
 
 # Streamlit App
-st.title("RivexFootyPredictor - Global Top 10 Trending Matches Edition")
+st.title("RivexFootyPredictor - Global Top 10 Trending Matches Edition (Football-Data.org)")
 
 # Load and display top 10 trending matches
 if st.button("📊 Show Top 10 Trending Games Worldwide"):
@@ -126,9 +120,9 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
         trending_fixtures = get_top_trending_fixtures(fixtures)
         st.subheader("🔥 Top 10 Trending Matches:")
         for i, fixture in enumerate(trending_fixtures, 1):
-            home_team = fixture['teams']['home']['name']
-            away_team = fixture['teams']['away']['name']
-            match_date = fixture['fixture']['date'][:10]
+            home_team = fixture['homeTeam']['name']
+            away_team = fixture['awayTeam']['name']
+            match_date = fixture['utcDate'][:10]
             st.write(f"{i}. {home_team} vs {away_team} - {match_date}")
 
         # Load into Roulette Wheel
@@ -138,9 +132,9 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
 
             # Randomly select a match after spin
             selected_match = random.choice(trending_fixtures)
-            home_team = selected_match['teams']['home']['name']
-            away_team = selected_match['teams']['away']['name']
-            match_datetime = selected_match['fixture']['date']
+            home_team = selected_match['homeTeam']['name']
+            away_team = selected_match['awayTeam']['name']
+            match_datetime = selected_match['utcDate']
 
             # Display Selected Match
             st.write(f"🎯 Selected Match: {home_team} vs {away_team} on {match_datetime}")
@@ -155,16 +149,6 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             home_advantage = random.uniform(0, 0.2)
             prediction_score = home_sentiment + home_advantage - away_sentiment
 
-            # Display Key Players
-            st.subheader("⚽ Key Players to Watch")
-            st.write(f"**{home_team} Key Players:**")
-            for player in [article['title'] for article in home_news][:3]:
-                st.write(f"- {player}")
-
-            st.write(f"**{away_team} Key Players:**")
-            for player in [article['title'] for article in away_news][:3]:
-                st.write(f"- {player}")
-
             # Finally, highlight the predicted outcome
             st.subheader("🔮 Predicted Outcome")
             if prediction_score > 0.1:
@@ -178,4 +162,4 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             st.write(f"**Predicted Scoreline:** {random.randint(1, 3)} - {random.randint(0, 2)}")
 
 # Note for Users
-# st.markdown("_This version adds API response debugging and verifies the season parameter._")
+st.markdown("_This version now uses Football-Data.org API instead of API-Football._")
