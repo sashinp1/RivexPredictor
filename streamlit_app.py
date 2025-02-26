@@ -13,18 +13,20 @@ analyzer = SentimentIntensityAnalyzer()
 # Football-Data.org API Key
 football_data_api_key = '2292620df705473dbddfbbb00505969b'
 
-# Top 10 leagues worldwide (Football-Data.org league codes)
+# Free version leagues from Football-Data.org
 league_codes = {
-    'Premier League': 'PL',
-    'La Liga': 'PD',
-    'Serie A': 'SA',
+    'FIFA World Cup': 'WC',
+    'UEFA Champions League': 'CL',
     'Bundesliga': 'BL1',
-    'Ligue 1': 'FL1',
-    'MLS': 'MLS',
     'Eredivisie': 'DED',
-    'Liga MX': 'LMX',
-    'J1 League': 'J1',
-    'Champions League': 'CL'
+    'Campeonato Brasileiro Série A': 'BSA',
+    'Primera Division': 'PD',
+    'Ligue 1': 'FL1',
+    'EFL Championship': 'ELC',
+    'Primeira Liga': 'PPL',
+    'European Championship': 'EC',
+    'Serie A': 'SA',
+    'Premier League': 'PL'
 }
 
 # Function to fetch news related to the match
@@ -112,7 +114,7 @@ def get_top_trending_fixtures(fixtures):
     return top_fixtures
 
 # Streamlit App
-st.title("RivexFootyPredictor - Global Top 10 Trending Matches Edition (Football-Data.org)")
+st.title("RivexFootyPredictor - Free League Edition (Football-Data.org)")
 
 # Load and display top 10 trending matches
 if st.button("📊 Show Top 10 Trending Games Worldwide"):
@@ -142,4 +144,4 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             st.write(f"🎯 Selected Match: {home_team} vs {away_team} on {match_datetime}")
 
 # Note for Users
-st.markdown("_This version now ensures the date range is within the Football-Data.org 10-day limit._")
+st.markdown("_This version now only supports leagues available in the free Football-Data.org plan._")
