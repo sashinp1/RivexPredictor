@@ -105,14 +105,14 @@ def run_backtest():
         home_advantage = random.uniform(0, 0.2)
         prediction_score = home_sentiment + home_advantage - away_sentiment
         
-        if prediction_score > 0.1:
+        predicted_home_score, predicted_away_score = predict_score(home_sentiment, away_sentiment, home_team, away_team)
+        
+        if predicted_home_score > predicted_away_score:
             predicted_result = f"{home_team} Win"
-        elif prediction_score < -0.1:
+        elif predicted_home_score < predicted_away_score:
             predicted_result = f"{away_team} Win"
         else:
             predicted_result = "Draw"
-        
-        predicted_home_score, predicted_away_score = predict_score(home_sentiment, away_sentiment, home_team, away_team)
         
         results.append({
             'Date': match_date,
