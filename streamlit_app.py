@@ -48,7 +48,7 @@ def fetch_fixtures():
     for league_name, league_id in league_ids.items():
         params = {
             'league': league_id,
-            'season': datetime.utcnow().year,
+            'season': datetime.utcnow().year,  # Verify if this season year is correct
             'from': start_date,
             'to': end_date,
             'timezone': 'UTC'
@@ -60,12 +60,15 @@ def fetch_fixtures():
         try:
             response = requests.get(url, headers=headers, params=params)
 
+            # Debug: Print the full API response
+            st.text(f"API Response for {league_name}: {response.text}")
+
             if response.status_code == 200:
                 data = response.json()
                 if data['response']:
                     fixtures.extend(data['response'])
                 else:
-                    st.warning(f"No fixtures found for {league_name}.")
+                    st.warning(f"No fixtures found for {league_name}. Verify league ID and season.")
             elif response.status_code == 401:
                 st.error("Unauthorized access. Check API key.")
                 return []
@@ -175,4 +178,4 @@ if st.button("📊 Show Top 10 Trending Games Worldwide"):
             st.write(f"**Predicted Scoreline:** {random.randint(1, 3)} - {random.randint(0, 2)}")
 
 # Note for Users
-st.markdown("_This version expands the fixture search window and adjusts the timeframe to avoid missing matches._")
+# st.markdown("_This version adds API response debugging and verifies the season parameter._")
