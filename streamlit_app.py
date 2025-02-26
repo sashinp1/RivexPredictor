@@ -85,6 +85,10 @@ def predict_score(home_sentiment, away_sentiment, home_team, away_team):
     
     return home_score, away_score
 
+# Function to check if prediction was correct
+def is_prediction_correct(predicted_result, actual_result):
+    return predicted_result in actual_result.values()
+
 # Function to run backtesting
 def run_backtest():
     historical_fixtures = fetch_historical_fixtures()
@@ -114,12 +118,15 @@ def run_backtest():
         else:
             predicted_result = "Draw"
         
+        correct_prediction = is_prediction_correct(predicted_result, actual_result)
+        
         results.append({
             'Date': match_date,
             'Match': f"{home_team} vs {away_team}",
             'Predicted Result': predicted_result,
             'Predicted Score': f"{predicted_home_score} - {predicted_away_score}",
-            'Actual Result': actual_result
+            'Actual Result': actual_result,
+            'Correct Prediction': correct_prediction
         })
     
     return results
@@ -134,10 +141,10 @@ if st.button("🔄 Run Backtest for 2023 Matches"):
     st.dataframe(df)
     
     # Display accuracy summary
-    correct_predictions = sum(1 for row in backtest_results if row['Predicted Result'] in row['Actual Result'].values())
+    correct_predictions = sum(1 for row in backtest_results if row['Correct Prediction'])
     total_predictions = len(backtest_results)
     accuracy = (correct_predictions / total_predictions) * 100 if total_predictions > 0 else 0
     st.write(f"✅ Backtest Accuracy: {accuracy:.2f}%")
 
 # Note for Users
-st.markdown("_This version now includes a one-click backtest mode with score predictions based on sentiment and historical trends._")
+st.markdown("_This version now includes a correctness check for predicted match results._")
